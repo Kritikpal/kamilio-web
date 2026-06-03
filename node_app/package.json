@@ -1,0 +1,17 @@
+{
+  "name": "voip-push-service",
+  "version": "1.0.0",
+  "description": "Minimal APNs VoIP (PushKit) push sender called by the Kamailio edge proxy",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

@@ -1,0 +1,120 @@
+# Kamailio SIP edge proxy + MySQL + rtpengine media relay.
+#
+# - mysql:     auth/subscriber + device-token store the cfg talks to as host `mysql`.
+# - kamailio:  the SIP proxy (ghcr.io/kamailio/kamailio-ci:6.0.0-alpine), bridge net.
+# - rtpengine: media relay on HOST networking (needs the public IP + a big UDP
+#              port range). Kamailio reaches its NG port via the host-gateway alias.
+#
+# Bring up:   docker compose up -d
+# Logs:       docker compose logs -f --tail=100 kamailio
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: unless-stopped
+    # Kamailio's Alpine image links the MariaDB connector, which lacks MySQL 8's
+    # default caching_sha2_password plugin. Force the classic native plugin so
+    # auth_db/sqlops can authenticate ("Plugin caching_sha2_password could not be loaded").
+    command: ["--default-authentication-plugin=mysql_native_password"]
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+      MYSQL_DATABASE: kamailio
+      MYSQL_USER: xyz
+      MYSQL_PASSWORD: xyz
+    # Init scripts run once on an empty data dir (see ./mysql-init).
+    volumes:
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uxyz", "-pxyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      # First boot initializes InnoDB + runs init scripts, which is slow on some
+      # disks. Failures during this window don't count against `retries`.
+      start_period: 240s
+    networks:
+      - voip
+
+  kamailio:
+    image: ghcr.io/kamailio/kamailio-ci:6.0.0-alpine
+    container_name: kamailio
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    # The image ENTRYPOINT is ["kamailio","-DD","-E"], which would swallow any
+    # `command:` as extra kamailio args (a stray `-c` in a shell wrapper makes it
+    # do a config-check-and-exit). Override the entrypoint with a real shell so we
+    # can create the ctl socket dir first. -DD = don't fork, -E = log to stderr.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "mkdir -p /var/run/kamailio && exec kamailio -f /etc/kamailio/kamailio.cfg -DD -E"
+    volumes:
+      - ./kamailio.cfg:/etc/kamailio/kamailio.cfg:ro
+    ports:
+      - "5060:5060/udp"
+      - "5060:5060/tcp"
+    # Bridged container -> host-network rtpengine NG control port.
+    extra_hosts:
+      - "rtpengine:host-gateway"
+    networks:
+      - voip
+
+  # VoIP/PushKit push sender. Kamailio calls http://node_app:5000/send-voip-push
+  # when an INVITE arrives for an offline (suspended iOS) user.
+  node_app:
+    build:
+      context: ./node_app
+    image: voip-push:local
+    container_name: node_app
+    restart: unless-stopped
+    environment:
+      PORT: "5000"
+      # APNS_MOCK=true => log the push and return success WITHOUT contacting
+      # Apple, so the stack runs locally without credentials. Flip to "false"
+      # and supply the APNS_* vars + mount the .p8 below for real pushes.
+      APNS_MOCK: "true"
+      APNS_PRODUCTION: "false"
+      # APNS_KEY_PATH: "/secrets/AuthKey.p8"
+      # APNS_KEY_ID: "ABCDE12345"
+      # APNS_TEAM_ID: "FGHIJ67890"
+      # APNS_BUNDLE_ID: "com.yourcompany.yourapp"
+    # volumes:
+    #   - ./secrets/AuthKey.p8:/secrets/AuthKey.p8:ro
+    ports:
+      - "5000:5000"
+    networks:
+      - voip
+
+  rtpengine:
+    build:
+      context: ./rtpengine
+    image: rtpengine:local
+    container_name: rtpengine
+    restart: unless-stopped
+    network_mode: host          # bind the public interface directly
+    environment:
+      # REQUIRED: the server's public IP.
+      PUBLIC_IP: "150.20.215.29"
+      # ONLY set this on clouds with 1:1 NAT (AWS/GCP/Azure) where the NIC only
+      # has a private IP. If `ip addr` does NOT show your public IP, set this.
+      # PRIVATE_IP: "10.0.0.5"
+      NG_LISTEN: "0.0.0.0:22222"
+      PORT_MIN: "30000"
+      PORT_MAX: "40000"
+      LOG_LEVEL: "6"
+      TIMEOUT: "60"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  voip:
+    driver: bridge
+
+volumes:
+  mysql_data:
