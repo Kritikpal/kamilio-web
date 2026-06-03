@@ -22,8 +22,31 @@ set -e
 : "${TIMEOUT:=60}"                  # drop call if no RTP for N seconds
 : "${SILENT_TIMEOUT:=3600}"
 
+# Decide what to bind vs. advertise.
+#
+# rtpengine must BIND a media address that actually exists on a local interface.
+# If we tell it to bind PUBLIC_IP but that IP is not on any local NIC (the usual
+# case on AWS/GCP/Azure and many VPS behind 1:1 NAT), every media-port bind fails
+# and rtpengine reports "Ran out of ports" on the very first call.
+#
+# So: if PRIVATE_IP isn't given, auto-detect. If PUBLIC_IP is already a local
+# address, bind it directly. Otherwise bind the primary local IP and ADVERTISE
+# PUBLIC_IP (the "bind!advertise" form), which is what makes media work behind NAT.
+if [ -z "$PRIVATE_IP" ]; then
+    if ip -o addr show 2>/dev/null | grep -qw "$PUBLIC_IP"; then
+        : # PUBLIC_IP is on a local NIC (plain public server) -> bind it directly.
+    else
+        PRIVATE_IP="$(ip -o -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.*src \([0-9.]*\).*/\1/p')"
+        if [ -n "$PRIVATE_IP" ]; then
+            echo "[rtpengine] PUBLIC_IP ${PUBLIC_IP} is not a local interface; auto-detected PRIVATE_IP=${PRIVATE_IP}"
+        else
+            echo "[rtpengine] WARNING: could not auto-detect a local IP; binding ${PUBLIC_IP} may fail (set PRIVATE_IP explicitly)"
+        fi
+    fi
+fi
+
 if [ -n "$PRIVATE_IP" ]; then
-    IFACE="${PRIVATE_IP}!${PUBLIC_IP}"
+    IFACE="${PRIVATE_IP}!${PUBLIC_IP}"   # bind private, advertise public
 else
     IFACE="${PUBLIC_IP}"
 fi
