@@ -9,7 +9,6 @@
 // the iOS app wakes, re-registers, and reports the call via CallKit.
 
 const express = require('express');
-const crypto = require('crypto');
 const { sendVoipPush, MOCK, PRODUCTION, VOIP_TOPIC } = require('./apns');
 
 const app = express();
@@ -29,29 +28,24 @@ app.post('/send-voip-push', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'deviceToken is required' });
   }
 
-  // Kamailio currently sends only deviceToken. The rest are optional so you can
-  // enrich the CallKit UI later (e.g. pass caller info from the SIP From header).
-  const uuid = body.uuid || crypto.randomUUID();
-  const callId = body.callId || null;
-  const handle = body.callerNumber || body.from || 'unknown';
+  // Kamailio sends `from` (caller) and `callId`. Map them to the fields the iOS
+  // app expects; explicit callerName/callerNumber/withVideo override if provided.
   const callerName = body.callerName || body.from || 'Incoming call';
+  const callerNumber = body.callerNumber || body.from || 'unknown';
+  const withVideo = body.withVideo === true || body.withVideo === 'true';
 
-  // Payload delivered to the app's PushKit delegate. The iOS app reads `uuid`
-  // and `handle` to report an incoming call to CallKit.
+  // Exact payload the app expects (matches the manual APNs curl).
   const payload = {
-    aps: {},
-    uuid,
-    callId,
-    handle,
+    aps: { 'content-available': 1 },
     callerName,
-    hasVideo: false,
-    sentAt: new Date().toISOString(),
+    callerNumber,
+    withVideo,
   };
 
   try {
     const result = await sendVoipPush(deviceToken, payload);
-    console.log(`[push] ok uuid=${uuid} apnsId=${result.apnsId} mock=${!!result.mock}`);
-    return res.json({ ok: true, uuid, apnsId: result.apnsId, mock: !!result.mock });
+    console.log(`[push] ok caller=${callerName} apnsId=${result.apnsId} mock=${!!result.mock}`);
+    return res.json({ ok: true, apnsId: result.apnsId, mock: !!result.mock });
   } catch (err) {
     console.error(`[push] failed: ${err.message}`);
     return res.status(502).json({
