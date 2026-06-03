@@ -70,19 +70,13 @@ services:
     image: voip-push:local
     container_name: node_app
     restart: unless-stopped
-    environment:
-      PORT: "5000"
-      # APNS_MOCK=true => log the push and return success WITHOUT contacting
-      # Apple, so the stack runs locally without credentials. Flip to "false"
-      # and supply the APNS_* vars + mount the .p8 below for real pushes.
-      APNS_MOCK: "true"
-      APNS_PRODUCTION: "false"
-      # APNS_KEY_PATH: "/secrets/AuthKey.p8"
-      # APNS_KEY_ID: "ABCDE12345"
-      # APNS_TEAM_ID: "FGHIJ67890"
-      # APNS_BUNDLE_ID: "com.yourcompany.yourapp"
-    # volumes:
-    #   - ./secrets/AuthKey.p8:/secrets/AuthKey.p8:ro
+    # All APNs settings live in node_app/apns.env. Edit that file and set
+    # APNS_MOCK=false (plus the APNS_* values) to send real pushes.
+    env_file:
+      - ./node_app/apns.env
+    # Mount your .p8 key (path must match APNS_KEY_PATH in apns.env) for real pushes:
+    volumes:
+      - ./secrets/AuthKey.p8:/secrets/AuthKey.p8:ro
     ports:
       - "5000:5000"
     networks:

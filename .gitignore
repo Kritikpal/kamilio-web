@@ -1,0 +1,44 @@
+# ---- Secrets / credentials (NEVER commit) ----
+# APNs keys and any mounted secrets
+*.p8
+secrets/
+# Runtime env files (contain APNs creds, DB passwords, etc.)
+.env
+*.env
+# ...but keep the templates/examples
+!*.env.example
+!.env.example
+
+# ---- Node (node_app) ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.pnp.*
+
+# ---- Logs ----
+*.log
+logs/
+
+# ---- Docker / data ----
+# Local DB data if ever bind-mounted (named volumes live outside the repo)
+mysql-data/
+mysql_data/
+
+# ---- OS cruft ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Editor / IDE ----
+.idea/
+*.swp
+*.swo
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# ---- Claude Code local settings (keep shared settings.json) ----
+.claude/settings.local.json
