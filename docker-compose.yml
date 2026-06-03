@@ -97,7 +97,7 @@ services:
     network_mode: host          # bind the public interface directly
     environment:
       # REQUIRED: the server's public IP.
-      PUBLIC_IP: "150.20.215.29"
+      PUBLIC_IP: "157.20.215.29"
       # ONLY set this on clouds with 1:1 NAT (AWS/GCP/Azure) where the NIC only
       # has a private IP. If `ip addr` does NOT show your public IP, set this.
       # PRIVATE_IP: "10.0.0.5"
