@@ -7,7 +7,8 @@
       "Bash(docker rm *)",
       "Bash(docker compose *)",
       "Bash(docker exec *)",
-      "Bash(python3 -c \"d=1780552254-1780486377; print\\('age =', round\\(d/3600,1\\), 'hours'\\)\")"
+      "Bash(python3 -c \"d=1780552254-1780486377; print\\('age =', round\\(d/3600,1\\), 'hours'\\)\")",
+      "WebFetch(domain:docs.siprix-voip.com)"
     ]
   }
 }
