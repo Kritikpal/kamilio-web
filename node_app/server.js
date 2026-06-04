@@ -35,6 +35,9 @@ app.post('/send-voip-push', async (req, res) => {
   const callId = body.callId || null;
   const handle = body.callerNumber || body.from || 'unknown';
   const callerName = body.callerName || body.from || 'Incoming call';
+  // Honor the video flag from the caller (accept either name). Hardcoding false
+  // made CallKit report every call as audio-only, hiding video calls.
+  const hasVideo = body.hasVideo === true || body.withVideo === true;
 
   // Payload delivered to the app's PushKit delegate. The iOS app reads `uuid`
   // and `handle` to report an incoming call to CallKit.
@@ -44,7 +47,7 @@ app.post('/send-voip-push', async (req, res) => {
     callId,
     handle,
     callerName,
-    hasVideo: false,
+    hasVideo,
     sentAt: new Date().toISOString(),
   };
 

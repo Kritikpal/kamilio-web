@@ -6,7 +6,8 @@
       "Bash(MSYS_NO_PATHCONV=1 docker run --rm --entrypoint /bin/sh rtpengine:local -c \"ldd /usr/local/bin/rtpengine | grep 'not found'\")",
       "Bash(docker rm *)",
       "Bash(docker compose *)",
-      "Bash(docker exec *)"
+      "Bash(docker exec *)",
+      "Bash(python3 -c \"d=1780552254-1780486377; print\\('age =', round\\(d/3600,1\\), 'hours'\\)\")"
     ]
   }
 }
