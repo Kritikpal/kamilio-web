@@ -25,6 +25,7 @@ app.post('/send-voip-push', async (req, res) => {
   const body = req.body || {};
   const { deviceToken } = body;
 
+  console.log('[server] received VoIP push request:', body);
   if (!deviceToken || typeof deviceToken !== 'string') {
     return res.status(400).json({ ok: false, error: 'deviceToken is required' });
   }
