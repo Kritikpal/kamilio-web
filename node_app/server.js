@@ -30,25 +30,33 @@ app.post('/send-voip-push', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'deviceToken is required' });
   }
 
-  // Kamailio currently sends only deviceToken. The rest are optional so you can
-  // enrich the CallKit UI later (e.g. pass caller info from the SIP From header).
   const uuid = body.uuid || crypto.randomUUID();
   const callId = body.callId || null;
-  const handle = body.callerNumber || body.from || 'unknown';
-  const callerName = body.callerName || body.from || 'Incoming call';
-  // Honor the video flag from the caller (accept either name). Hardcoding false
-  // made CallKit report every call as audio-only, hiding video calls.
-  const hasVideo = body.hasVideo === true || body.withVideo === true;
+  // pushHint correlates this push with the SIP INVITE (Kamailio puts the same
+  // value in an X-PushHint header on the INVITE). Siprix matches them so the
+  // CallKit call binds to the SIP call. Falls back to callId if not provided.
+  const pushHint = body.pushHint || body.callId || null;
+  // Caller identity (accept Siprix names + our older names).
+  const callerId = body.callerId || body.callerNumber || body.from || 'unknown';
+  const callerName = body.callerName || callerId || 'Incoming call';
+  // Honor the video flag (accept either name). Hardcoding false made CallKit
+  // report every call as audio-only, hiding video calls.
+  const withVideo = body.withVideo === true || body.hasVideo === true;
 
-  // Payload delivered to the app's PushKit delegate. The iOS app reads `uuid`
-  // and `handle` to report an incoming call to CallKit.
+  // Payload delivered to the app's PushKit delegate. Siprix-standard fields
+  // (callerId/callerName/withVideo/pushHint) plus our older fields for
+  // backward compatibility with the existing app handler.
   const payload = {
     aps: {},
-    uuid,
-    callId,
-    handle,
+    pushHint,
+    callerId,
     callerName,
-    hasVideo,
+    withVideo,
+    callId,
+    // backward-compat aliases (older app builds read these):
+    uuid,
+    handle: callerId,
+    hasVideo: withVideo,
     sentAt: new Date().toISOString(),
   };
 
