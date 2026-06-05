@@ -106,6 +106,20 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Lightweight browser-based Docker log viewer. Reads the Docker socket
+  # (read-only) to stream logs from every container; open it at host port 9999.
+  # No auth / no reverse proxy for now -- restrict access via firewall.
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    restart: unless-stopped
+    ports:
+      - "9999:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - voip
+
 networks:
   voip:
     driver: bridge
