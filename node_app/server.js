@@ -43,9 +43,14 @@ app.get('/health', (req, res) => {
 app.post('/hard-unregister', async (req, res) => {
   const body = req.body || {};
   const { username, password, domain } = body;
+  // Short id to correlate the log lines of a single request. NEVER log password.
+  const reqId = crypto.randomBytes(4).toString('hex');
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+  console.log(`[hard-unregister][${reqId}] request from ${ip} username=${username || '(missing)'} domain=${domain || '(none)'}`);
 
   if (typeof username !== 'string' || !username ||
       typeof password !== 'string' || !password) {
+    console.warn(`[hard-unregister][${reqId}] rejected 400 -> username and password are required`);
     return res.status(400).json({ ok: false, error: 'username and password are required' });
   }
 
@@ -59,23 +64,30 @@ app.post('/hard-unregister', async (req, res) => {
     }
     sql += ' LIMIT 1';
 
+    console.log(`[hard-unregister][${reqId}] looking up user...`);
     const [rows] = await pool.query(sql, params);
     const user = rows[0];
 
-    // Generic failure (do not reveal whether the username exists).
-    if (!user || !safeEqual(password, user.password)) {
-      console.warn(`[hard-unregister] auth failed for username=${username}`);
+    if (!user) {
+      console.warn(`[hard-unregister][${reqId}] auth failed 401 -> user not found (username=${username})`);
       return res.status(401).json({ ok: false, error: 'invalid credentials' });
     }
 
+    // Generic failure (do not reveal whether it was a wrong password vs no user).
+    if (!safeEqual(password, user.password)) {
+      console.warn(`[hard-unregister][${reqId}] auth failed 401 -> wrong password (username=${username}, id=${user.id})`);
+      return res.status(401).json({ ok: false, error: 'invalid credentials' });
+    }
+
+    console.log(`[hard-unregister][${reqId}] authenticated id=${user.id}; current token=${user.device_token ? 'set' : 'null'} -> clearing`);
     const [result] = await pool.query(
       "UPDATE user_details SET device_token = NULL, status = 'offline' WHERE id = ?",
       [user.id],
     );
-    console.log(`[hard-unregister] cleared token for ${username} (affected=${result.affectedRows})`);
+    console.log(`[hard-unregister][${reqId}] done 200 -> token cleared for ${username} (affected=${result.affectedRows})`);
     return res.json({ ok: true, username, cleared: result.affectedRows > 0 });
   } catch (err) {
-    console.error(`[hard-unregister] error: ${err.message}`);
+    console.error(`[hard-unregister][${reqId}] error 500 -> ${err.message}`);
     return res.status(500).json({ ok: false, error: 'internal error' });
   }
 });
