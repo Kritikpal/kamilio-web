@@ -14,7 +14,11 @@ const { sendVoipPush, MOCK, PRODUCTION, VOIP_TOPIC } = require('./apns');
 const { pool } = require('./db');
 
 const app = express();
+// Body parsers (built into Express, no extra dependency):
+//  - json:       Content-Type: application/json
+//  - urlencoded: Content-Type: application/x-www-form-urlencoded (HTML form / curl -d)
 app.use(express.json({ limit: '16kb' }));
+app.use(express.urlencoded({ extended: true, limit: '16kb' }));
 
 const PORT = parseInt(process.env.PORT || '5000', 10);
 
