@@ -70,8 +70,14 @@ services:
     image: voip-push:local
     container_name: node_app
     restart: unless-stopped
+    # Talks to the same MySQL as Kamailio (for /hard-unregister). Wait for it.
+    depends_on:
+      mysql:
+        condition: service_healthy
     # All APNs settings live in node_app/apns.env. Edit that file and set
     # APNS_MOCK=false (plus the APNS_* values) to send real pushes.
+    # DB defaults (host=mysql, user/pass=xyz, db=kamailio) match the pool in
+    # db.js; override with DB_HOST/DB_USER/DB_PASSWORD/DB_NAME if needed.
     env_file:
       - ./node_app/apns.env
     # Mount your .p8 key (path must match APNS_KEY_PATH in apns.env) for real pushes:

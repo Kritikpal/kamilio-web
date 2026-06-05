@@ -11,14 +11,73 @@
 const express = require('express');
 const crypto = require('crypto');
 const { sendVoipPush, MOCK, PRODUCTION, VOIP_TOPIC } = require('./apns');
+const { pool } = require('./db');
 
 const app = express();
 app.use(express.json({ limit: '16kb' }));
 
 const PORT = parseInt(process.env.PORT || '5000', 10);
 
+// Constant-time string compare (avoids leaking the password via timing).
+// timingSafeEqual requires equal-length buffers, so length-mismatch -> false.
+function safeEqual(a, b) {
+  const ba = Buffer.from(String(a), 'utf8');
+  const bb = Buffer.from(String(b), 'utf8');
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
+
 app.get('/health', (req, res) => {
   res.json({ ok: true, mock: MOCK, production: PRODUCTION, topic: VOIP_TOPIC || null });
+});
+
+// Hard unregister: authenticate the user (username + password against the same
+// user_details table Kamailio uses) and NULL their VoIP push token, so future
+// INVITEs for them skip the push instead of waking a device that has logged out.
+//
+//   POST /hard-unregister   {"username":"711","password":"secret711"}
+//   (optionally include "domain" to disambiguate)
+//
+// Note: this only clears the push token. Any live usrloc registration ages out
+// on its own (db_mode=0, in-memory) or on the next Expires:0 REGISTER.
+app.post('/hard-unregister', async (req, res) => {
+  const body = req.body || {};
+  const { username, password, domain } = body;
+
+  if (typeof username !== 'string' || !username ||
+      typeof password !== 'string' || !password) {
+    return res.status(400).json({ ok: false, error: 'username and password are required' });
+  }
+
+  try {
+    // username is UNIQUE in user_details; optionally constrain by domain.
+    const params = [username];
+    let sql = 'SELECT id, password, device_token FROM user_details WHERE username = ?';
+    if (typeof domain === 'string' && domain) {
+      sql += ' AND domain = ?';
+      params.push(domain);
+    }
+    sql += ' LIMIT 1';
+
+    const [rows] = await pool.query(sql, params);
+    const user = rows[0];
+
+    // Generic failure (do not reveal whether the username exists).
+    if (!user || !safeEqual(password, user.password)) {
+      console.warn(`[hard-unregister] auth failed for username=${username}`);
+      return res.status(401).json({ ok: false, error: 'invalid credentials' });
+    }
+
+    const [result] = await pool.query(
+      "UPDATE user_details SET device_token = NULL, status = 'offline' WHERE id = ?",
+      [user.id],
+    );
+    console.log(`[hard-unregister] cleared token for ${username} (affected=${result.affectedRows})`);
+    return res.json({ ok: true, username, cleared: result.affectedRows > 0 });
+  } catch (err) {
+    console.error(`[hard-unregister] error: ${err.message}`);
+    return res.status(500).json({ ok: false, error: 'internal error' });
+  }
 });
 
 app.post('/send-voip-push', async (req, res) => {
