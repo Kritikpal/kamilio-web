@@ -26,4 +26,10 @@ jobs:
             set -e
             cd ${{ secrets.DEPLOY_PATH }}
             git pull
+            docker-compose down
+            # Force-remove in case `down` left a container behind (name clash,
+            # restart policy, etc.). `|| true` so a missing container doesn't
+            # abort the script under `set -e`.
+            docker rm -f kamailio || true
+            docker rm -f node_app || true
             docker-compose up -d --build
