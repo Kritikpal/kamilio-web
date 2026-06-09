@@ -2,7 +2,7 @@ name: Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [old-branch]
   workflow_dispatch: {}
 
 # One deploy at a time; let an in-flight deploy finish rather than cancel it.
