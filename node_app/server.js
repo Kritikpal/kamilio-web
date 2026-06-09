@@ -9,7 +9,6 @@
 // the iOS app wakes, re-registers, and reports the call via CallKit.
 
 const express = require('express');
-const crypto = require('crypto');
 const { sendVoipPush, MOCK, PRODUCTION, VOIP_TOPIC } = require('./apns');
 const { pool } = require('./db');
 
@@ -137,8 +136,8 @@ app.post('/send-voip-push', async (req, res) => {
 
   try {
     const result = await sendVoipPush(deviceToken, payload);
-    console.log(`[push] ok uuid=${uuid} apnsId=${result.apnsId} mock=${!!result.mock}`);
-    return res.json({ ok: true, uuid, apnsId: result.apnsId, mock: !!result.mock });
+    console.log(`[push] ok caller=${callerName} apnsId=${result.apnsId} mock=${!!result.mock}`);
+    return res.json({ ok: true, apnsId: result.apnsId, mock: !!result.mock });
   } catch (err) {
     console.error(`[push] failed: ${err.message}`);
     return res.status(502).json({
