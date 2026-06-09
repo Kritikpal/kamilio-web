@@ -15,7 +15,8 @@
       "WebFetch(domain:chatgpt.com)",
       "WebFetch(domain:kamailio.org)",
       "WebFetch(domain:pub.dev)",
-      "Bash(curl -s -i http://localhost:5000/health)"
+      "Bash(curl -s -i http://localhost:5000/health)",
+      "Bash(docker info *)"
     ]
   }
 }

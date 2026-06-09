@@ -8,6 +8,7 @@
 // and logs the JSON response. We turn that into an APNs VoIP/PushKit push so
 // the iOS app wakes, re-registers, and reports the call via CallKit.
 
+const crypto = require('crypto');
 const express = require('express');
 const { sendVoipPush, MOCK, PRODUCTION, VOIP_TOPIC } = require('./apns');
 const { pool } = require('./db');
