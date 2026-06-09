@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install --omit=dev
 
-COPY server.js apns.js ./
+COPY server.js apns.js db.js ./
 
 ENV PORT=5000
 EXPOSE 5000

@@ -56,12 +56,21 @@ function getProviderToken() {
 let session = null;
 function getSession() {
   if (session && !session.closed && !session.destroyed) return session;
+  console.log('[apns] connecting HTTP/2 ->', HOST);
   session = http2.connect(HOST);
+  session.once('connect', () => console.log('[apns] HTTP/2 connected ->', HOST));
   session.on('error', (err) => {
-    console.error('[apns] session error:', err.message);
+    // err.message is often empty for TLS/socket failures; log code + full error.
+    console.error(`[apns] session error: code=${err.code || '?'} msg="${err.message || ''}"`);
+    console.error(err);
     session = null;
   });
-  session.on('goaway', () => { session = null; });
+  // Underlying TLS/socket failures surface here, not always on 'error'.
+  session.on('socketError', (err) => console.error('[apns] socketError:', err && err.code, err && err.message));
+  session.on('goaway', (code, lastStreamID, opaqueData) => {
+    console.error(`[apns] GOAWAY code=${code} opaque=${opaqueData ? opaqueData.toString() : ''}`);
+    session = null;
+  });
   return session;
 }
 
