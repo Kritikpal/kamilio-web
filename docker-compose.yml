@@ -104,7 +104,7 @@ services:
       NG_LISTEN: "0.0.0.0:22222"
       PORT_MIN: "30000"
       PORT_MAX: "40000"
-      LOG_LEVEL: "6"
+      LOG_LEVEL: "7"
       TIMEOUT: "60"
     logging:
       driver: json-file
